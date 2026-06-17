@@ -24,58 +24,153 @@ composer create-project laravel/laravel --prefer-dist .
 ## База данных
 
 ```sql
-CREATE TABLE customers (
-    id   INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL
+-- ------------------------------------------------------------
+-- 1. Клиенты (из Заказчики.json)
+-- ------------------------------------------------------------
+CREATE TABLE clients (
+    id VARCHAR(20) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    inn VARCHAR(20) DEFAULT NULL,
+    address VARCHAR(255) DEFAULT NULL,
+    phone VARCHAR(20) DEFAULT NULL,
+    salesman BOOLEAN NOT NULL DEFAULT FALSE,
+    buyer BOOLEAN NOT NULL DEFAULT FALSE
 );
 
-CREATE TABLE products (
-    id    INT AUTO_INCREMENT PRIMARY KEY,
-    name  VARCHAR(255)  NOT NULL,
-    unit  VARCHAR(50)   NOT NULL,
-    price DECIMAL(10,2) NOT NULL
+-- ------------------------------------------------------------
+-- 2. Номенклатура — единый справочник продукции и материалов
+-- type: 'product' = готовая продукция, 'material' = сырьё
+-- ------------------------------------------------------------
+CREATE TABLE nomenclature (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    code VARCHAR(50) DEFAULT NULL,
+    name VARCHAR(255) NOT NULL,
+    type ENUM('product', 'material') NOT NULL,
+    unit VARCHAR(20) NOT NULL DEFAULT 'шт',
+    price DECIMAL(10,2) DEFAULT NULL
 );
 
-CREATE TABLE materials (
-    id    INT AUTO_INCREMENT PRIMARY KEY,
-    name  VARCHAR(255)  NOT NULL,
-    unit  VARCHAR(50)   NOT NULL,
-    price DECIMAL(10,2) NOT NULL
-);
-
+-- ------------------------------------------------------------
+-- 3. Спецификации — заголовок (одна спецификация на продукт)
+-- ------------------------------------------------------------
 CREATE TABLE specifications (
-    id         INT AUTO_INCREMENT PRIMARY KEY,
-    product_id INT          NOT NULL,
-    name       VARCHAR(255) NOT NULL,
-    FOREIGN KEY (product_id) REFERENCES products(id)
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    product_id INT NOT NULL,
+    quantity DECIMAL(10,4) NOT NULL DEFAULT 1,
+    unit VARCHAR(20) NOT NULL DEFAULT 'шт',
+    FOREIGN KEY (product_id) REFERENCES nomenclature(id)
 );
 
-CREATE TABLE specification_materials (
-    id               INT AUTO_INCREMENT PRIMARY KEY,
-    specification_id INT            NOT NULL,
-    material_id      INT            NOT NULL,
-    quantity         DECIMAL(10,3)  NOT NULL,
+-- ------------------------------------------------------------
+-- 4. Состав спецификации — какие материалы и в каком количестве
+-- ------------------------------------------------------------
+CREATE TABLE specification_lines (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    specification_id INT NOT NULL,
+    material_id INT NOT NULL,
+    quantity DECIMAL(10,4) NOT NULL,
+    unit VARCHAR(20) NOT NULL DEFAULT 'кг',
     FOREIGN KEY (specification_id) REFERENCES specifications(id),
-    FOREIGN KEY (material_id)      REFERENCES materials(id)
+    FOREIGN KEY (material_id) REFERENCES nomenclature(id)
 );
 
+-- ------------------------------------------------------------
+-- 5. Заказы — заголовок
+-- ------------------------------------------------------------
 CREATE TABLE orders (
-    id           INT AUTO_INCREMENT PRIMARY KEY,
-    customer_id  INT         NOT NULL,
-    order_number VARCHAR(50) NOT NULL,
-    order_date   DATE        NOT NULL,
-    FOREIGN KEY (customer_id) REFERENCES customers(id)
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    number INT NOT NULL,
+    order_date DATE NOT NULL,
+    client_id VARCHAR(20) NOT NULL,
+    FOREIGN KEY (client_id) REFERENCES clients(id)
 );
 
-CREATE TABLE order_items (
-    id         INT AUTO_INCREMENT PRIMARY KEY,
-    order_id   INT           NOT NULL,
-    product_id INT           NOT NULL,
-    quantity   INT           NOT NULL,
-    price      DECIMAL(10,2) NOT NULL,
-    FOREIGN KEY (order_id)   REFERENCES orders(id),
-    FOREIGN KEY (product_id) REFERENCES products(id)
+-- ------------------------------------------------------------
+-- 6. Позиции заказа — продукция, количество, цены
+-- ------------------------------------------------------------
+CREATE TABLE order_lines (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    order_id INT NOT NULL,
+    product_id INT NOT NULL,
+    quantity DECIMAL(10,4) NOT NULL,
+    unit VARCHAR(20) NOT NULL DEFAULT 'шт',
+    price DECIMAL(10,2) NOT NULL,
+    total DECIMAL(10,2) GENERATED ALWAYS AS (quantity * price) STORED,
+    FOREIGN KEY (order_id) REFERENCES orders(id),
+    FOREIGN KEY (product_id) REFERENCES nomenclature(id)
 );
+
+-- ------------------------------------------------------------
+-- 7. Производство — заголовок
+-- ------------------------------------------------------------
+CREATE TABLE production (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    number INT NOT NULL,
+    production_date DATE NOT NULL
+);
+
+-- ------------------------------------------------------------
+-- 8. Выпуск продукции — что было произведено
+-- ------------------------------------------------------------
+CREATE TABLE production_outputs (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    production_id INT NOT NULL,
+    product_id INT NOT NULL,
+    quantity DECIMAL(10,4) NOT NULL,
+    unit VARCHAR(20) NOT NULL DEFAULT 'шт',
+    FOREIGN KEY (production_id) REFERENCES production(id),
+    FOREIGN KEY (product_id) REFERENCES nomenclature(id)
+);
+
+-- ------------------------------------------------------------
+-- 9. Расход материалов — что было списано в производство
+-- ------------------------------------------------------------
+CREATE TABLE production_inputs (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    production_id INT NOT NULL,
+    material_id INT NOT NULL,
+    quantity DECIMAL(10,4) NOT NULL,
+    unit VARCHAR(20) NOT NULL DEFAULT 'кг',
+    FOREIGN KEY (production_id) REFERENCES production(id),
+    FOREIGN KEY (material_id) REFERENCES nomenclature(id)
+);
+
+
+-- ------------------------------------------------------------
+-- Импорт данных из Заказчики.json в таблицу clients
+-- ------------------------------------------------------------
+INSERT INTO clients (id, name, inn, address, phone, salesman, buyer) VALUES
+('000000001', 'ООО "Поставка"', NULL, 'г.Пятигорск', '+79198634592', TRUE, TRUE),
+('000000002', 'ООО "Кинотеатр Квант"', '26320045123', 'г. Железноводск, ул. Мира, 123', '+79884581555', TRUE, FALSE),
+('000000008', 'ООО "Новый JDTO"', '26320045111', 'г. Железноводсу', '+79884581555', TRUE, FALSE),
+('000000003', 'ООО "Ромашка"', '4140784214', 'г. Омск, ул. Строителей, 294', '+79882584546', FALSE, TRUE),
+('000000009', 'ООО "Ипподром"', '5874045632', 'г. Уфа, ул. Набережная, 37', '+79627486389', TRUE, TRUE),
+('000000010', 'ООО "Ассоль"', '2629011278', 'г. Калуга, ул. Пушкина, 94', '+79184572398', FALSE, TRUE);
+
+
+-- Детализация стоимости по каждой позиции заказа
+SELECT
+    o.number AS order_number,
+    o.order_date,
+    c.name AS client_name,
+    prod.name AS product_name,
+    ol.quantity AS order_quantity,
+    unit_costs.unit_cost AS cost_per_unit,
+    ol.quantity * unit_costs.unit_cost AS line_total
+FROM orders o
+JOIN clients c ON c.id = o.client_id
+JOIN order_lines ol ON ol.order_id = o.id
+JOIN nomenclature prod ON prod.id = ol.product_id
+JOIN (
+    SELECT
+        s.product_id,
+        SUM(sl.quantity * n.price) AS unit_cost
+    FROM specifications s
+    JOIN specification_lines sl ON sl.specification_id = s.id
+    JOIN nomenclature n ON n.id = sl.material_id
+    GROUP BY s.product_id
+) AS unit_costs ON unit_costs.product_id = ol.product_id;
 ```
 
 ---
@@ -745,3 +840,4 @@ Route::get('/get', [TestCaseController::class, 'getData'])
 Route::post('/check', [TestCaseController::class, 'checkData'])
     ->name('test-case.check');
 ```
+### 
