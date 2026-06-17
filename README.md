@@ -489,54 +489,44 @@ class ViewsController extends Controller
 ```php
 <?php
 
+use App\Http\Controllers\ViewsController;
+use App\Http\Controllers\ActionsController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', [App\Http\Controllers\ViewsController::class, 'index'])
-    ->name('dashboard')
+Route::get ('/',[ViewsController::class, 'index'])
+    ->name ('dashboard')
     ->middleware(['auth']);
 
-Route::get('/login', [App\Http\Controllers\ViewsController::class, 'login'])
-    ->name('login')
+Route::get ('/login',[ViewsController::class, 'login'])
+    ->name ('login')
     ->middleware(['guest']);
+Route::post ('/login',[ActionsController::class, 'login'])
+    ->middleware('guest');
 
-Route::post('/login', [App\Http\Controllers\ActionsController::class, 'login'])
-    ->middleware(['guest']);
-
-Route::post('/logout', [App\Http\Controllers\ActionsController::class, 'logout'])
-    ->name('logout')
+Route::get ('/login/change-password',[ViewsController::class, 'changePassword'])
+    ->name ('login.change-password')
     ->middleware(['auth']);
+Route::post ('/login/change-password',[ActionsController::class, 'changePassword'])
+    ->middleware('auth');
 
-Route::get('/login/change-password', [App\Http\Controllers\ViewsController::class, 'changePassword'])
-    ->name('change_password')
+Route::get ('/user/{user?}',[ViewsController::class, 'editUser'])
+    ->name ('user')
     ->middleware(['auth']);
-
-Route::post('/login/change-password', [App\Http\Controllers\ActionsController::class, 'changePassword'])
-    ->name('login.change-password')
-    ->middleware(['auth']);
-
-Route::get('/user', [App\Http\Controllers\ViewsController::class, 'editUser'])
-    ->name('user.create')
-    ->middleware(['auth']);
-
-Route::get('/user/{user}', [App\Http\Controllers\ViewsController::class, 'editUser'])
-    ->name('user')
-    ->middleware(['auth']);
-
-Route::delete('/user/{user}', [App\Http\Controllers\ActionsController::class, 'deleteUser'])
-    ->name('user.delete')
-    ->middleware(['auth']);
-
-Route::patch('/user/{user}', [App\Http\Controllers\ActionsController::class, 'unlockUser'])
-    ->name('user.unlock')
-    ->middleware(['auth']);
-
-Route::post('/user', [App\Http\Controllers\ActionsController::class, 'createUser'])
-    ->name('user.save')
-    ->middleware(['auth']);
-
-Route::put('/user/{user}', [App\Http\Controllers\ActionsController::class, 'editUser'])
-    ->name('user.update')
-    ->middleware(['auth']);
+Route::delete ('/user/{user}',[ActionsController::class, 'deleteUser'])
+    ->name ('user.delete')
+    ->middleware('auth');
+Route::patch ('/user/{user?}',[ActionsController::class, 'unlockUser'])
+    ->name ('user.unlock')
+    ->middleware('auth');
+Route::post ('/user/{user?}',[ActionsController::class, 'createUser'])
+    ->name ('user.save')
+    ->middleware('auth');
+Route::put ('/user/{user}',[ActionsController::class, 'editUser'])
+    ->name ('user.update')
+    ->middleware('auth');
+Route::post ('/logout',[ActionsController::class, 'logout'])
+    ->name ('logout')
+    ->middleware('auth');
 ```
 
 ---
@@ -547,10 +537,11 @@ Route::put('/user/{user}', [App\Http\Controllers\ActionsController::class, 'edit
 
 ```html
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Login</title>
 </head>
 <body>
@@ -584,7 +575,8 @@ Route::put('/user/{user}', [App\Http\Controllers\ActionsController::class, 'edit
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Change Password</title>
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Need to change password</title>
 </head>
 <body>
     <form action="{{ route('login.change-password') }}" method="POST">
@@ -604,7 +596,7 @@ Route::put('/user/{user}', [App\Http\Controllers\ActionsController::class, 'edit
             @enderror
         </div>
         <div>
-            <label for="new_password_repeat">Repeat Password:</label>
+            <label for="new_password_repeat">Repeat New Password:</label>
             <input type="password" id="new_password_repeat" name="new_password_repeat" required>
         </div>
         <button type="submit">Change Password</button>
@@ -621,18 +613,13 @@ Route::put('/user/{user}', [App\Http\Controllers\ActionsController::class, 'edit
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Dashboard</title>
 </head>
 <body>
-    <h1>Welcome to Dashboard</h1>
-
-    <form action="{{ route('logout') }}" method="POST" style="display:inline; float:right;">
-        @csrf
-        <button type="submit">Logout</button>
-    </form>
-
+    <h1>Welcome to the Dashboard</h1>
     <h2>List of Users</h2>
-    <table border="1">
+    <table border = '1'>
         <thead>
             <tr>
                 <th>Name</th>
@@ -650,20 +637,16 @@ Route::put('/user/{user}', [App\Http\Controllers\ActionsController::class, 'edit
                     <td>{{ $user->need_to_change_password ? 'Yes' : 'No' }}</td>
                     <td>{{ $user->wrong_counter === 3 ? 'Yes' : 'No' }}</td>
                     <td>
-                        <a href="{{ route('user', $user->id) }}">Edit</a>
-
-                        <form action="{{ route('user.delete', $user->id) }}" method="POST" style="display:inline;">
+                       <a href = "{{ route('user', ['user' => $user->id]) }}">Edit</a>
+                       <form action="{{ route('user.delete', ['user' => $user->id]) }}" method="POST" style="display:inline;">
                             @csrf
                             @method('DELETE')
                             <button type="submit">Delete</button>
                         </form>
-
-                        <form action="{{ route('user.unlock', $user->id) }}" method="POST" style="display:inline;">
+                        <form action="{{ route('user.unlock', ['user' => $user->id]) }}" method="POST" style="display:inline;">
                             @csrf
                             @method('PATCH')
-                            <button type="submit">
-                                {{ $user->wrong_counter === 3 ? 'Unblock' : 'Block' }}
-                            </button>
+                            <button type="submit">{{ $user->wrong_counter === 3 ? 'Unlock' : 'Block' }}</button>
                         </form>
                     </td>
                 </tr>
@@ -672,15 +655,19 @@ Route::put('/user/{user}', [App\Http\Controllers\ActionsController::class, 'edit
         <tfoot>
             <tr>
                 <td colspan="5">
-                    <a href="{{ route('user.create') }}">Create new user</a>
+                    <a href="{{ route('user') }}">Create New User</a>
+                    <form action="{{ route('logout') }}" method="POST" style="display:inline;">
+                        @csrf
+                        <button type="submit">Logout</button>
+                    </form>
                 </td>
+
             </tr>
         </tfoot>
     </table>
-
-    @if (session('status'))
-        <div>
-            <strong>{{ session('status') }}</strong>
+    @if(session('message'))
+        <div class="status">
+            {{ session('message') }}
         </div>
     @endif
 </body>
@@ -695,48 +682,43 @@ Route::put('/user/{user}', [App\Http\Controllers\ActionsController::class, 'edit
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ $user ? 'Edit User' : 'Create User' }}</title>
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>{{ $user ? 'Edit user' : 'Create user' }}</title>
 </head>
 <body>
-    <h1>{{ $user ? 'Edit User' : 'Create User' }}</h1>
-
+    <h1>{{ $user ? 'Edit user' : 'Create user' }}</h1>
     <form action="{{ $user ? route('user.update', $user->id) : route('user.save') }}" method="POST">
         @csrf
         @if ($user)
             @method('PUT')
         @endif
-
         <div>
             <label for="name">Name:</label>
-            <input type="text" id="name" name="name" value="{{ $user->name ?? '' }}" required>
+            <input type="text" id="name" name="name" value="{{ old('name', $user->name ?? '') }}" required>
         </div>
         <div>
             <label for="email">Email:</label>
-            <input type="email" id="email" name="email" value="{{ $user->email ?? '' }}" required>
+            <input type="email" id="email" name="email" value="{{ old('email', $user->email ?? '') }}" required>
         </div>
         <div>
             <label for="password">Password:</label>
             <input type="password" id="password" name="password" {{ $user ? '' : 'required' }}>
         </div>
-        <div>
-            <label for="password_confirmation">Confirm Password:</label>
-            <input type="password" id="password_confirmation" name="password_confirmation" {{ $user ? '' : 'required' }}>
-        </div>
-
-        <button type="submit">{{ $user ? 'Update' : 'Create' }}</button>
+        <button type="submit">{{ $user ? 'Update user' : 'Create user' }}</button>
         <a href="{{ route('dashboard') }}">Cancel</a>
     </form>
-
-    @if ($errors->any())
-        <div>
+    <form>
+        @if($errors->any())
+          <div>
             <h2>Errors:</h2>
             <ul>
                 @foreach ($errors->all() as $error)
                     <li>{{ $error }}</li>
                 @endforeach
             </ul>
-        </div>
-    @endif
+          </div>
+        @endif
+    </form>
 </body>
 </html>
 ```
