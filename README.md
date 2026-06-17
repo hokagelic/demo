@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/29037137/README.md)
 # Демо-экзамен КОД 09.02.07-5-2026
 
 ## Содержание
