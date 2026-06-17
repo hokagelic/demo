@@ -296,54 +296,53 @@ class ActionsController extends Controller
 {
     public function login(Request $request)
     {
-        $request->validate([
-            'email'    => 'required|email',
-            'password' => 'required|string|min:6',
-        ]);
+            $request->validate([
+                'email' => 'required|email',
+                'password' => 'required|string|min:6',
+            ]);
 
-        if (Auth::attempt($request->only(['email', 'password']))) {
-            $user = Auth::user();
+            if (Auth::attempt($request->only(['email','password']))){
+                $user = Auth::user();
+                if ($user->wrong_counter === 3) {
+                    Auth::logout();
 
-            if ($user->wrong_counter === 3) {
-                Auth::logout();
-                return redirect()
-                    ->route('login')
-                    ->withErrors(['email' => 'Your account is locked. Please contact support.']);
+                    return redirect()
+                        ->route('login')
+                        ->withErrors(['email' => 'Your account is locked due to too many failed login attempts.']);
+                }
+
+                if ($user->need_to_change_password) {
+                    return redirect()
+                    ->route('login.change-password')
+                    ->with('status','You need to change your password.');
+                }
+                return redirect()->route('dashboard');
             }
 
-            if ($user->need_to_change_password) {
-                return redirect()
-                    ->route('change_password')
-                    ->with('status', 'You need to change your password before proceeding.');
-            }
+             if ($user = User::firstWhere('email', $request->input('email'))) {
+                if ($user->wrong_counter != 3){
+                    $user->wrong_counter++;
+                    $user->save();
+                }
+                if ($user->wrong_counter === 3) {
+                    return redirect()
+                        ->route('login')
+                        ->withErrors(['email' => 'Your account has been locked due to too many failed login attempts.']);
+                }
+             };
 
-            return redirect()->route('dashboard');
-        }
-
-        if ($user = User::firstWhere('email', $request->input('email'))) {
-            if ($user->wrong_counter != 3) {
-                $user->wrong_counter++;
-                $user->save();
-            }
-
-            if ($user->wrong_counter === 3) {
-                return redirect()
-                    ->route('login')
-                    ->withErrors(['email' => 'Your account is locked. Please contact support.']);
-            }
-        }
-
-        return redirect()
-            ->route('login')
-            ->withErrors(['email' => 'Invalid credentials. Please try again.'])
-            ->withInput($request->only('email'));
+            return redirect()
+                ->route('login')
+                ->withErrors(['email' => 'The provided credentials do not match our records.'])
+                ->withInput($request->only('email'));
     }
 
-    public function changePassword(Request $request)
+
+    public function changePassword(Request  $request)
     {
         $request->validate([
             'current_password' => 'required|string|min:6|current_password',
-            'new_password'     => 'required|string|min:6|confirmed:new_password_repeat',
+            'new_password' => 'required|string|min:6|confirmed:new_password_repeat',
         ]);
 
         $user = Auth::user();
@@ -353,91 +352,89 @@ class ActionsController extends Controller
 
         return redirect()
             ->route('dashboard')
-            ->with('status', 'Password changed successfully.');
+            ->with('status', 'Your password has been changed successfully.');
+
     }
 
     public function editUser(User $user, Request $request)
     {
         $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => "required|email|unique:users,email,{$user->id}",
-            'password' => 'nullable|string|min:6|confirmed',
+            'name' => 'required|string|max:255',
+            'email' => "required|email|unique:users,email,{$user->id}",
+            'password' => 'nullable|string|min:6',
         ]);
 
-        $user->name  = $request->input('name');
+        $user->name = $request->input('name');
         $user->email = $request->input('email');
-
         if ($request->filled('password')) {
             $user->password = $request->input('password');
         }
-
         $user->save();
 
         return redirect()
             ->route('dashboard')
-            ->with('status', 'User updated successfully.');
+            ->with('status', 'User has been updated successfully.');
+
     }
 
     public function createUser(Request $request)
     {
         $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6|confirmed',
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:6',
         ]);
 
         $user = new User();
-        $user->name     = $request->input('name');
-        $user->email    = $request->input('email');
+        $user->name = $request->input('name');
+        $user->email = $request->input('email');
         $user->password = $request->input('password');
         $user->save();
 
         return redirect()
             ->route('dashboard')
-            ->with('status', 'User created successfully.');
+            ->with('status', 'User has been created successfully.');
     }
 
     public function deleteUser(User $user)
     {
-        if ($user->id === Auth::id()) {
+        if($user->id === Auth::id()){
             return redirect()
                 ->route('dashboard')
                 ->withErrors(['user' => 'You cannot delete your own account.']);
         }
-
         $user->delete();
-
         return redirect()
             ->route('dashboard')
-            ->with('status', 'User deleted successfully.');
-    }
-
-    public function logout(Request $request)
-    {
-        Auth::logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return redirect()->route('login');
+            ->with('status', 'User has been deleted successfully.');
     }
 
     public function unlockUser(User $user)
     {
-        if ($user->wrong_counter !== 3) {
+        if($user->id === Auth::id()){
+            return redirect()
+                ->route('dashboard')
+                ->withErrors(['user' => 'You cannot lock/unlock your own account.']);
+        }
+        if ($user->wrong_counter !== 3){
             $user->wrong_counter = 3;
             $user->save();
 
             return redirect()
                 ->route('dashboard')
-                ->with('status', 'User locked successfully.');
+                ->with('status', 'User  account has been locked successfully.');
         }
-
         $user->wrong_counter = 0;
         $user->save();
-
         return redirect()
             ->route('dashboard')
-            ->with('status', 'User unlocked successfully.');
+            ->with('status', 'User account has been unlocked successfully.');
+        }
+
+    public function logout()
+    {
+        Auth::logout();
+        return redirect()->route('login');
     }
 }
 ```
@@ -450,31 +447,34 @@ class ActionsController extends Controller
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use Illuminate\Http\Request;
 
 class ViewsController extends Controller
 {
     public function index()
     {
-        return view('index', [
-            'users' => User::all(),
+        return view ('index', [
+            'users' => User::all()
         ]);
     }
 
     public function login()
+        {
+            return view ('login');
+        }
+    public function logout()
     {
-        return view('login');
+        return view ('logout');
     }
 
     public function changePassword()
     {
-        return view('change_password');
+        return view ('change_password');
     }
 
     public function editUser(?User $user = null)
     {
-        return view('user_form', [
-            'user' => $user,
+        return view('user_form' , [
+            'user' => $user
         ]);
     }
 }
