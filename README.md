@@ -16,7 +16,6 @@
 
 ```bash
 composer create-project laravel/laravel --prefer-dist .
- /^[0-9]{2} [0-9]{2} [0-9]{6}$/
 ```
 
 ---
